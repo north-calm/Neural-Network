@@ -1,3 +1,6 @@
+:: this may need configuring based on where you added raylib on your system 
+
+
 @echo off
 echo Compiling main.c...
 

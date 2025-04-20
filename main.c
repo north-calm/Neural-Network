@@ -1,475 +1,271 @@
-/*
- * Copyright (c) 2025 Satish Singh & Arman Badyal
- * All Rights Reserved.
- *
- * Unauthorized copying, modification, distribution, or use of this software,
- * via any medium, is strictly prohibited without explicit permission from
- * the author.
- */
+#include "raylib.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <float.h> // For DBL_MAX, DBL_MIN
+#include "nn.h"   // NN functions are declared here
 
- #include <stdio.h>
- #include <stdlib.h>
- #include <time.h>
- #include <math.h>
- 
- /* ========== Data Structures ========== */
- 
- /**
-  * Structure to represent a weight node in the linked list
-  * Each weight connects a neuron to all neurons in the previous layer
-  */
- typedef struct WeightNode {
-     double weight;               // Weight value
-     struct WeightNode *next;     // Pointer to next weight
-     struct WeightNode *prev;     // Pointer to previous weight
- } Weight;
- 
- /**
-  * Structure to represent a neuron in the network
-  * Each neuron has a bias, an output value, and weights to previous layer
-  */
- typedef struct Neuron {
-     Weight* weightNode;          // Linked list of weights to previous layer
-     double bias;                 // Bias value for the neuron
-     double value;                // Output value of the neuron after activation
-     struct Neuron *next;         // Pointer to next neuron in the same layer
-     struct Neuron *prev;         // Pointer to previous neuron in the same layer
- } Neuron;
- 
- /**
-  * Structure to represent a layer in the network
-  * Each layer contains a linked list of neurons
-  */
- typedef struct Layer {
-     Neuron* neuron;              // Linked list of neurons in this layer
-     struct Layer *next;          // Pointer to next layer
-     struct Layer *prev;          // Pointer to previous layer
- } Layer;
- 
- /* ========== Function Declarations ========== */
- void initializeNetwork(int [], int);
- int importNetwork(void);
- double relu(double);
- void softmax(double*, double*, int);
- void feedForward(double []);
- void displayFinalOutput(void);
- 
- /* ========== Global Variables ========== */
- int n = 3;                          // Number of layers in the network
- int network_structure[] = {784, 128, 10};  // Number of neurons per layer
- Layer *Network = NULL;              // Head of the network linked list (global access point)
- 
- /* ========== Main Function ========== */
- int main() {
-     // Seed the random number generator for different weights each run
-     srand(time(NULL));
-     
-     // Initialize the network with random weights and biases
-     initializeNetwork(network_structure, n);
-     
-     // Import pre-trained weights and biases from files
-     importNetwork();
-     
-     // Test with first example input (a digit image in flattened format)
-     printf("\n===== PROCESSING FIRST INPUT =====\n");
-     double input1[784] = {
-        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,1,1,1,1,1,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,0,1,1,1,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,1,1,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-     };
-     
-     // Perform forward pass and display results
-     feedForward(input1);
-     displayFinalOutput();
-     
-     // Test with second example input
-     printf("\n===== PROCESSING SECOND INPUT =====\n");
-     double input2[784] = {
-        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,1,1,0,0,0,1,1,1,1,1,0,0,0,1,1,0,0,0,0,0,
-        0,0,0,0,0,0,0,1,1,0,0,0,1,1,1,1,0,0,0,0,0,1,1,0,0,0,0,0,
-        0,0,0,0,0,0,0,1,1,0,0,0,1,1,1,0,0,0,0,0,0,1,1,0,0,0,0,0,
-        0,0,0,0,0,0,0,1,1,0,0,1,1,1,0,0,0,0,0,0,0,1,1,0,0,0,0,0,
-        0,0,0,0,0,0,0,1,1,0,0,1,1,1,0,0,0,0,0,0,0,1,1,0,0,0,0,0,
-        0,0,0,0,0,0,0,1,1,0,0,0,1,1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,1,1,0,0,0,0,1,1,1,0,0,0,1,1,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,1,1,1,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-    };
-     
-     // Perform forward pass and display results
-     feedForward(input2);
-     displayFinalOutput();
-     
-     return 0;
- }
- 
- /**
-  * Initialize the neural network with the specified structure
-  * 
-  * @param structure Array containing number of neurons in each layer
-  * @param n1 Number of layers in the network
-  */
- void initializeNetwork(int structure[], int n1) {
-     int num = 0;
-     
-     printf("\nInitializing Neural Network\n");
-     
-     Layer* head = NULL;    // Head of the layer linked list
-     Layer* tail = NULL;    // Tail pointer to keep track of last layer
-     
-     // Create each layer in the network
-     for(int i = 0; i < n1; i++) {
-         Layer* l = (Layer*) malloc(sizeof(Layer));
-         if (l == NULL) {
-             fprintf(stderr, "Memory allocation failed for layer\n");
-             exit(1);
-         }
-         
-         num = structure[i];    // Number of neurons in current layer
-         
-         Neuron *n = NULL;      // Head of neuron linked list for this layer
-         Neuron *n_tail = NULL; // Tail pointer for neurons
-         
-         // Create neurons for this layer
-         for(int j = 0; j < num; j++) {
-             Neuron* tempNeuron = (Neuron*) malloc(sizeof(Neuron));
-             if (tempNeuron == NULL) {
-                 fprintf(stderr, "Memory allocation failed for neuron\n");
-                 exit(1);
-             }
-             
-             // Initialize with random bias between -0.5 and 0.5
-             tempNeuron->bias = (rand() / (double)RAND_MAX) - 0.5;
-             
-             Weight *w = NULL;     // Head of weight linked list
-             Weight *w_tail = NULL; // Tail pointer for weights
-             
-             // Create weights for this neuron (except for input layer)
-             if (i > 0) {
-                 for(int k = 0; k < network_structure[i-1]; k++) {
-                     Weight *tw = (Weight*)malloc(sizeof(Weight));
-                     if (tw == NULL) {
-                         fprintf(stderr, "Memory allocation failed for weight\n");
-                         exit(1);
-                     }
-                     
-                     // Random weight initialization between -1 and 1
-                     tw->weight = (rand() / (double)RAND_MAX) * 2 - 1;
-                     
-                     // Add to weight linked list
-                     if(w == NULL) {
-                         w = tw;
-                         w_tail = tw;
-                         tw->prev = NULL;
-                         tw->next = NULL;
-                     } else {
-                         tw->prev = w_tail;
-                         w_tail->next = tw;
-                         w_tail = tw;
-                         w_tail->next = NULL;
-                     }
-                 }
-             }
-             
-             tempNeuron->weightNode = w;  // Attach weights to the neuron
-             
-             // Add to neuron linked list
-             if(n == NULL) {
-                 n = tempNeuron;
-                 n_tail = tempNeuron;
-                 tempNeuron->prev = NULL;
-                 tempNeuron->next = NULL;
-             } else {
-                 tempNeuron->prev = n_tail;
-                 n_tail->next = tempNeuron;
-                 n_tail = tempNeuron;
-                 n_tail->next = NULL;
-             }
-         }
-         
-         l->neuron = n;  // Attach neurons to the layer
-         
-         // Add to layer linked list
-         if(head == NULL) {
-             head = l;
-             tail = l;
-             l->prev = NULL;
-             l->next = NULL;
-         } else {
-             l->prev = tail;
-             tail->next = l;
-             tail = l;
-             tail->next = NULL;
-         }
-     }
-     
-     Network = head;  // Set the global network pointer
-     printf("Network initialization complete\n");
- }
- 
- /**
-  * ReLU activation function
-  * Returns x if x >= 0, otherwise returns 0
-  * 
-  * @param x Input value
-  * @return Activated value
-  */
- double relu(double x) {
-     return x >= 0 ? x : 0;
- }
- 
- /**
-  * Softmax activation function for output layer
-  * Converts raw outputs to probability distribution
-  * 
-  * @param input Array of input values
-  * @param output Array to store softmax results
-  * @param size Size of the arrays
-  */
- void softmax(double* input, double* output, int size) {
-     // Find the maximum value for numerical stability
-     double max_val = input[0];
-     for (int i = 1; i < size; i++) {
-         if (input[i] > max_val) {
-             max_val = input[i];
-         }
-     }
-     
-     // Compute exp(x - max) for each element and sum them
-     double sum = 0.0;
-     for (int i = 0; i < size; i++) {
-         output[i] = exp(input[i] - max_val);
-         sum += output[i];
-     }
-     
-     // Normalize by dividing each value by the sum
-     for (int i = 0; i < size; i++) {
-         output[i] /= sum;
-     }
- }
- 
- /**
-  * Forward propagation through the network
-  * Takes input array and propagates values through the network
-  * 
-  * @param input Array of input values (must match input layer size)
-  */
+#define GRID_W 28
+#define GRID_H 28
+#define SCR_W 2000
+#define SCR_H 1200
+
+const int PAD = 50;
+const double BRUSH_R = 10.0; 
+const Color BG_COL = BLACK;
+const Color FG_COL = WHITE;
+const int FONT_SZ_INFO = 20;
+
+// --- Function Declarations ---
+void flatten2D(double input2D[GRID_H][GRID_W], double output1D[GRID_W * GRID_H]);
+Rectangle CalculateBoundingBox(Image img, Color bgCol);
+void CenterImage(Image srcImg, RenderTexture2D destTexture, Color bgCol);
+// --- NN Function Calls ---
+// initializeNetwork, importNetwork, feedForward, getPrediction, displayFinalOutput
+
+// --- Function Definitions --- 
+
+void flatten2D(double input2D[GRID_H][GRID_W], double output1D[GRID_W * GRID_H]) {
+    int index = 0;
+    for (int i = 0; i < GRID_H; i++) {
+        for (int j = 0; j < GRID_W; j++) {
+            output1D[index++] = input2D[i][j];
+        }
+    }
+}
+Rectangle CalculateBoundingBox(Image img, Color bgCol) {
+    if (img.data == NULL) return (Rectangle){0, 0, 0, 0};
+    int minX = img.width, minY = img.height, maxX = -1, maxY = -1;
+    bool foundPixel = false;
+
+    for (int y = 0; y < img.height; y++) {
+        for (int x = 0; x < img.width; x++) {
+            Color pix = GetImageColor(img, x, y);
+            if (pix.r != bgCol.r || pix.g != bgCol.g || pix.b != bgCol.b || pix.a != bgCol.a) {
+                if (x < minX) minX = x;
+                if (y < minY) minY = y;
+                if (x > maxX) maxX = x;
+                if (y > maxY) maxY = y;
+                foundPixel = true;
+            }
+        }
+    }
+
+    if (foundPixel) {
+        return (Rectangle){(float)minX, (float)minY, (float)(maxX - minX + 1), (float)(maxY - minY + 1)};
+    } else {
+        return (Rectangle){0, 0, 0, 0};
+    }
+}
+
+void CenterImage(Image srcImg, RenderTexture2D destTexture, Color bgCol) {
+     if (srcImg.data == NULL) return;
+    Rectangle bbox = CalculateBoundingBox(srcImg, bgCol);
+
+    if (bbox.width <= 0 || bbox.height <= 0) {
+        BeginTextureMode(destTexture);
+        ClearBackground(bgCol);
+        EndTextureMode();
+        return;
+    }
+
+    float scaleX = (float)destTexture.texture.width / bbox.width;
+    float scaleY = (float)destTexture.texture.height / bbox.height;
+    float scale = (scaleX < scaleY) ? scaleX : scaleY;
+    scale *= 0.60f; // Padding factor
+
+    float destWidth = bbox.width * scale;
+    float destHeight = bbox.height * scale;
+    float destX = (destTexture.texture.width - destWidth) / 2.0f;
+    float destY = (destTexture.texture.height - destHeight) / 2.0f;
+    Rectangle destRect = { destX, destY, destWidth, destHeight };
+    Rectangle sourceRect = bbox;
+
+    Texture2D tempTex = LoadTextureFromImage(srcImg);
+
+    BeginTextureMode(destTexture);
+    ClearBackground(bgCol);
+    DrawTexturePro(tempTex, sourceRect, destRect, (Vector2){0, 0}, 0.0f, WHITE);
+    EndTextureMode();
+
+    UnloadTexture(tempTex);
+}
+
+// --- Main Function ---
+int main(void) {
+    int predicted_digit = -1;
+    double inputGrid[GRID_H][GRID_W] = {0.0};
+    double input1D[GRID_W * GRID_H];
+
+    // --- Initialize NN ---
+    initializeNetwork(network_structure, n);
+    importNetwork();
+
+    // --- Setup Window & Layout ---
+    InitWindow(SCR_W, SCR_H, "Raylib Digit Recognizer (Improved)");
+    SetTargetFPS(90);
+
+    const int marginB = 50, prvW = 280, txtW = 200, elemPad = 40;
+    const int availH = SCR_H - PAD * 2 - marginB;
+    int drawSz = availH;
+    int padL = PAD;
+
+    Rectangle drawRect = { (float)padL, (float)PAD, (float)drawSz, (float)drawSz };
+    Rectangle prvRect = { drawRect.x + drawRect.width + elemPad, drawRect.y, (float)prvW, (float)prvW };
+    double prvCW = prvRect.width / GRID_W, prvCH = prvRect.height / GRID_H;
+    Rectangle txtRect = { prvRect.x + prvRect.width + elemPad, prvRect.y, (float)txtW, (float)prvW }; // Area for prediction text
 
 
- void feedForward(double input[]) {
-     Layer* currentLayer = Network;
-     Neuron* n = currentLayer->neuron;
-     
-     // Set input layer values directly from input array
-     for(int i = 0; i < network_structure[0]; i++) {
-         n->value = (double)input[i];
-         n = n->next;
-     }
-     
-     // Process each hidden and output layer
-     currentLayer = currentLayer->next;
-     int h = 1;  // Layer index counter
-     
-     while(currentLayer != NULL) {
-         Neuron* currentNeuron = currentLayer->neuron;
-         
-         // Process each neuron in current layer
-         for(int i = 0; i < network_structure[h]; i++) {
-             double value = 0.0;
-             Neuron* previousLayerNeuron = currentLayer->prev->neuron;
-             Weight* w = currentNeuron->weightNode;
-             
-             // Calculate weighted sum from previous layer
-             for(int j = 0; j < network_structure[h-1]; j++) {
-                 value += (w->weight) * (previousLayerNeuron->value);
-                 previousLayerNeuron = previousLayerNeuron->next;
-                 w = w->next;
-             }
-             
-             // Apply activation function (ReLU) with bias
-             if(h!= 2) {
-                 currentNeuron->value = relu(value + (currentNeuron->bias));
-             } else { // For output layer, apply softmax later
-                 currentNeuron->value = value + (currentNeuron->bias);
-             }
+    // --- Render Textures ---
+    RenderTexture2D drawingCanvas = LoadRenderTexture(drawRect.width, drawRect.height);
+    BeginTextureMode(drawingCanvas); ClearBackground(BG_COL); EndTextureMode();
 
-             currentNeuron = currentNeuron->next;
-         }
-         
-         currentLayer = currentLayer->next;
-         h++;
-     }
- }
- 
- /**
-  * Display the output layer values with softmax applied
-  * Shows the final prediction probabilities for each class
-  */
- void displayFinalOutput() {
-     double output[10] = {0};      // Raw outputs
-     double final_output[10] = {0}; // Softmax probabilities
-     int i = 0;
-     
-     // Navigate to the last layer
-     Layer* lastLayer = Network;
-     while (lastLayer->next != NULL) {
-         lastLayer = lastLayer->next;
-     }
-     
-     // Collect raw output values
-     printf("Final Output (Class Probabilities):\n");
-     Neuron* outputNeuron = lastLayer->neuron;
-     while(outputNeuron != NULL) {
-         output[i] = outputNeuron->value;
-         outputNeuron = outputNeuron->next;
-         i++;
-     }
-     
-     // Apply softmax to get probabilities
-     softmax(output, final_output, 10);
-     
-     // Display the probabilities for each class
-     for(i = 0; i < 10; i++) {
-         printf("Class %d: %lf\n", i, final_output[i]);
-     }
-     
-     // Find and display the predicted class (highest probability)
-     int prediction = 0;
-     double max_prob = final_output[0];
-     for(i = 1; i < 10; i++) {
-         if(final_output[i] > max_prob) {
-             max_prob = final_output[i];
-             prediction = i;
-         }
-     }
-     printf("\nPredicted digit: %d (confidence: %.2f%%)\n", prediction, max_prob*100);
- }
- 
- /**
-  * Import pre-trained weights and biases from files
-  * 
-  * @return 0 on success, 1 on failure
-  */
- int importNetwork() {
-     printf("Importing network parameters from files...\n");
-     
-     // Open model parameter files
-     FILE *b1 = fopen("b1.txt", "r");  // Biases for first hidden layer
-     FILE *b2 = fopen("b2.txt", "r");  // Biases for output layer
-     FILE *w1 = fopen("W1_transpose.txt", "r");  // Weights for first hidden layer
-     FILE *w2 = fopen("W2_transpose.txt", "r");  // Weights for output layer
-     
-     // Check if files opened successfully
-     if (b1 == NULL || b2 == NULL || w1 == NULL || w2 == NULL) {
-         perror("Error opening parameter files. Check if files exist in the same directory.");
-         return 1;
-     }
-     
-     // Verify network is initialized
-     if(Network == NULL) {
-         printf("Error: Network is not initialized\n");
-         return 1;
-     }
-     
-     // Navigate through network structure and import parameters
-     int i = 0;
-     Layer* head = Network;
-     
-     // Process each layer
-     while (head != NULL) {
-         Neuron* tn = head->neuron;
-         
-         // Process each neuron in the layer
-         for(int j = 0; j < network_structure[i]; j++) {
-             // Import biases for hidden and output layers
-             if(i == 1) {
-                 if(fscanf(b1, "%lf", &tn->bias) != 1) {
-                     printf("Error reading bias for hidden layer\n");
-                     return 1;
-                 }
-             } else if(i == 2) {
-                 if(fscanf(b2, "%lf", &tn->bias) != 1) {
-                     printf("Error reading bias for output layer\n");
-                     return 1;
-                 }
-             }
-             
-             // Import weights (except for input layer which doesn't have weights)
-             if(i != 0) {
-                 Weight *tw = tn->weightNode;
-                 while(tw != NULL) {
-                     if(i == 1) {
-                         if(fscanf(w1, "%lf", &tw->weight) != 1) {
-                             printf("Error reading weight for hidden layer\n");
-                             return 1;
-                         }
-                     } else if(i == 2) {
-                         if(fscanf(w2, "%lf", &tw->weight) != 1) {
-                             printf("Error reading weight for output layer\n");
-                             return 1;
-                         }
-                     }
-                     tw = tw->next;
-                 }
-             }
-             
-             tn = tn->next;
-         }
-         
-         i++;
-         head = head->next;
-     }
-     
-     // Close all files
-     fclose(b1);
-     fclose(b2);
-     fclose(w1);
-     fclose(w2);
-     
-     printf("Network parameters imported successfully\n");
-     return 0;
- }
+    RenderTexture2D centeredCanvas = LoadRenderTexture(drawRect.width, drawRect.height);
+    BeginTextureMode(centeredCanvas); ClearBackground(BG_COL); EndTextureMode();
+
+    RenderTexture2D finalInputTexture = LoadRenderTexture(GRID_W, GRID_H);
+    BeginTextureMode(finalInputTexture); ClearBackground(BG_COL); EndTextureMode();
+
+
+    bool drawing = false;
+    Vector2 prevMp = { -1.0f, -1.0f };
+
+    // --- Main Loop ---
+    while (!WindowShouldClose()) {
+        Vector2 mp = GetMousePosition();
+        bool inDrawRect = CheckCollisionPointRec(mp, drawRect);
+        Vector2 mpCanv = { mp.x - drawRect.x, mp.y - drawRect.y };
+
+        // --- Drawing Logic ---
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && inDrawRect) {
+            drawing = true;
+            prevMp = mpCanv;
+            BeginTextureMode(drawingCanvas); DrawCircleV(mpCanv, BRUSH_R, FG_COL); EndTextureMode();
+        }
+        if (drawing && IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+            if (inDrawRect) {
+                BeginTextureMode(drawingCanvas);
+                DrawCircleV(mpCanv, BRUSH_R, FG_COL);
+                DrawLineEx(prevMp, mpCanv, BRUSH_R * 2.0f, FG_COL);
+                EndTextureMode();
+                prevMp = mpCanv;
+            } else {
+                drawing = false;
+                prevMp = (Vector2){ -1.0f, -1.0f };
+            }
+        }
+        if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
+            drawing = false;
+            prevMp = (Vector2){ -1.0f, -1.0f };
+        }
+
+        // --- Clear Logic ---
+        if (IsKeyPressed(KEY_C)) {
+            BeginTextureMode(drawingCanvas); ClearBackground(BG_COL); EndTextureMode();
+            BeginTextureMode(centeredCanvas); ClearBackground(BG_COL); EndTextureMode();
+            BeginTextureMode(finalInputTexture); ClearBackground(BG_COL); EndTextureMode();
+            for (int y = 0; y < GRID_H; ++y)
+                for (int x = 0; x < GRID_W; ++x)
+                    inputGrid[y][x] = 0.0;
+            predicted_digit = -1; // Reset prediction
+            drawing = false;
+            prevMp = (Vector2){ -1.0f, -1.0f };
+        }
+
+        // --- Process Logic (KEY_ENTER) ---
+        if (IsKeyPressed(KEY_ENTER)) {
+            Image drawnImage = LoadImageFromTexture(drawingCanvas.texture);
+
+            CenterImage(drawnImage, centeredCanvas, BG_COL);
+            Image centeredImg = LoadImageFromTexture(centeredCanvas.texture);
+            Image finalImage = ImageCopy(centeredImg); // Work on a copy
+
+            // Ensure format is grayscale and resize to final 28x28
+            ImageFormat(&finalImage, PIXELFORMAT_UNCOMPRESSED_GRAYSCALE);
+            ImageResize(&finalImage, GRID_W, GRID_H);
+
+            // --- Directly populate inputGrid from the 28x28 finalImage ---
+            if (finalImage.data != NULL && finalImage.width == GRID_W && finalImage.height == GRID_H) {
+                unsigned char* pixels = (unsigned char*)finalImage.data;
+                for (int y = 0; y < GRID_H; y++) {
+                    for (int x = 0; x < GRID_W; x++) {
+                        // Get the grayscale pixel value (0-255)
+                        unsigned char intensity = pixels[y * GRID_W + x];
+                        // Normalize to 0.0 (black) - 1.0 (white) for the NN input
+                        inputGrid[y][x] = (double)intensity / 255.0;
+                    }
+                }
+            } else {
+                 // Handle error case if image processing failed
+                 TraceLog(LOG_ERROR, "Failed to process image to 28x28 grayscale");
+                 for (int y = 0; y < GRID_H; ++y) for (int x = 0; x < GRID_W; ++x) inputGrid[y][x] = 0.0;
+            }
+
+            flatten2D(inputGrid, input1D);
+            feedForward(input1D);
+
+            printf("\n--- Network Output Probabilities ---\n");
+            displayFinalOutput(); // Prints probabilities to CONSOLE
+            printf("------------------------------------\n");
+
+            predicted_digit = getPrediction();
+
+            UnloadImage(drawnImage);
+            UnloadImage(centeredImg);
+            UnloadImage(finalImage);
+        }
+        // --- Drawing Section ---
+        BeginDrawing();
+        ClearBackground(LIGHTGRAY);
+
+        // Draw the raw drawing canvas
+        DrawTextureRec(drawingCanvas.texture, (Rectangle){ 0, 0, (float)drawingCanvas.texture.width, (float)-drawingCanvas.texture.height }, (Vector2){ drawRect.x, drawRect.y }, WHITE);
+        DrawRectangleLinesEx(drawRect, 2, DARKGRAY);
+        DrawText("Drawing Area", drawRect.x, drawRect.y - 25, 20, DARKGRAY);
+
+        // Draw the 28x28 preview
+        DrawText("28x28 Input Preview", prvRect.x, prvRect.y - 25, 20, DARKGRAY);
+        DrawRectangleLinesEx(prvRect, 1, DARKGRAY);
+        for (int y = 0; y < GRID_H; y++) {
+            for (int x = 0; x < GRID_W; x++) {
+                unsigned char gray = (unsigned char)(255.0 * (1.0 - inputGrid[y][x])); // Invert for display
+                Color cellCol = { gray, gray, gray, 255 };
+                DrawRectangle((int)(prvRect.x + x * prvCW), (int)(prvRect.y + y * prvCH), (int)ceil(prvCW), (int)ceil(prvCH), cellCol);
+            }
+        }
+
+        // --- Draw Prediction Text ---
+        DrawRectangleRec(txtRect, Fade(SKYBLUE, 0.1f)); // Background for prediction text area
+        DrawRectangleLinesEx(txtRect, 1, DARKGRAY);
+        DrawText("Prediction Info", txtRect.x + 5, txtRect.y - 25, 20, DARKGRAY);
+
+        if (predicted_digit != -1) {
+            // Draw the main prediction
+            const char *predLabel = TextFormat("Predicted: %d", predicted_digit);
+            int predFontSize = 30;
+            Vector2 predSize = MeasureTextEx(GetFontDefault(), predLabel, predFontSize, 1);
+            DrawText(predLabel, (int)(txtRect.x + (txtRect.width - predSize.x)/2), (int)txtRect.y + 10, predFontSize, MAROON);
+
+             // Add note about console output
+            DrawText("Probabilities printed", txtRect.x + 10, txtRect.y + 60, FONT_SZ_INFO, DARKGRAY);
+            DrawText("to console window.", txtRect.x + 10, txtRect.y + 60 + FONT_SZ_INFO + 2, FONT_SZ_INFO, DARKGRAY);
+
+        } else {
+             DrawText("Draw a digit", (int)txtRect.x + 10, (int)txtRect.y + 10, FONT_SZ_INFO, DARKGRAY);
+             DrawText("and press [Enter]", (int)txtRect.x + 10, (int)txtRect.y + 10 + FONT_SZ_INFO + 2, FONT_SZ_INFO, DARKGRAY);
+             DrawText("Check console for probs.", (int)txtRect.x + 10, (int)txtRect.y + 10 + 2*(FONT_SZ_INFO + 2), FONT_SZ_INFO, DARKGRAY);
+        }
+
+
+        DrawText("[LMB] Draw | [C] Clear | [Enter] Process", PAD, SCR_H - 35, 20, DARKGRAY);
+
+        EndDrawing();
+    }
+
+    // --- Cleanup ---
+    UnloadRenderTexture(drawingCanvas);
+    UnloadRenderTexture(centeredCanvas);
+    UnloadRenderTexture(finalInputTexture);
+    CloseWindow();
+    return 0;
+}

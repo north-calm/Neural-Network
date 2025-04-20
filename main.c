@@ -20,8 +20,6 @@ const int FONT_SZ_INFO = 20;
 void flatten2D(double input2D[GRID_H][GRID_W], double output1D[GRID_W * GRID_H]);
 Rectangle CalculateBoundingBox(Image img, Color bgCol);
 void CenterImage(Image srcImg, RenderTexture2D destTexture, Color bgCol);
-// --- NN Function Calls ---
-// initializeNetwork, importNetwork, feedForward, getPrediction, displayFinalOutput
 
 // --- Function Definitions --- 
 
